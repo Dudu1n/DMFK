@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desmascarando Fakes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: palco preto, pílulas com contorno branco (como nos slides), vermelho só nos pontos de decisão. Uma coluna central, abas em pílula no topo. */
+:root{
+  --bg:#0a0708; --surface:#130e10; --line:#f2ece9; --line-soft:#3a2a2d;
+  --fg:#f6f1ee; --muted:#b4a6a4; --accent:#d1121f; --accent-soft:#3a0d11;
+  --v-false:#ff4d57; --v-mislead:#f2a93b; --v-context:#6fb1ff; --v-true:#4cc38a; --v-none:#a99f9d;
+  --display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font:400 17px/1.6 var(--body);padding-block:0 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background-image:radial-gradient(900px 420px at 85% -80px,#3a0d11 0,transparent 70%)}
+a{color:inherit}
+.wrap{max-width:980px;margin:0 auto}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+
+/* topo */
+.top{display:flex;align-items:center;gap:14px;padding:18px 0 10px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font:800 15px/1 var(--display);letter-spacing:.04em;text-transform:uppercase}
+.brand svg{width:26px;height:26px;flex:none}
+.brand small{font:600 11px var(--mono);color:var(--muted);letter-spacing:.12em;margin-left:2px}
+nav.tabs{margin-left:auto;display:flex;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:4px;overflow-x:auto;max-width:100%}
+nav.tabs a{white-space:nowrap;text-decoration:none;font:600 12px var(--display);letter-spacing:.06em;text-transform:uppercase;padding:10px 16px;border-radius:999px;color:var(--muted)}
+nav.tabs a:hover{color:var(--fg)}
+nav.tabs a[aria-current="page"]{background:var(--accent);color:#fff}
+
+h1,h2,h3{font-family:var(--display);text-transform:uppercase;line-height:1.05;text-wrap:balance;margin:0}
+h1{font-size:clamp(34px,8vw,76px);font-weight:800;letter-spacing:-.01em}
+h1 em{font-style:normal;color:var(--accent)}
+h2{font-size:clamp(22px,4vw,34px);font-weight:800}
+h3{font-size:15px;font-weight:800;letter-spacing:.03em}
+.eyebrow{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:clamp(18px,2.4vw,21px);max-width:60ch;color:var(--fg);margin:18px 0 0}
+.pill{border:1.5px solid var(--line);border-radius:28px}
+
+.view[hidden]{display:none!important}
+section.block{margin-top:56px}
+
+/* hero + verificador */
+.hero{padding:34px 0 8px}
+.checker{margin-top:30px;background:var(--surface);padding:18px;display:grid;gap:14px}
+.checker label{font:600 12px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.checker textarea{width:100%;min-height:128px;resize:vertical;background:var(--bg);color:var(--fg);border:1.5px solid var(--line-soft);border-radius:18px;padding:14px 16px;font:400 17px/1.5 var(--body)}
+.checker textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.btn{cursor:pointer;border:0;border-radius:999px;padding:14px 26px;font:800 13px var(--display);letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:#fff}
+.btn:hover{filter:brightness(1.12)}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn.ghost{background:transparent;color:var(--fg);border:1.5px solid var(--line)}
+.examples{display:flex;gap:8px;flex-wrap:wrap}
+.chip{cursor:pointer;background:transparent;color:var(--muted);border:1.5px solid var(--line-soft);border-radius:999px;padding:7px 13px;font:500 13px var(--mono)}
+.chip:hover{color:var(--fg);border-color:var(--line)}
+.note{font-size:14.5px;color:var(--muted);margin:0}
+
+/* resultado */
+.result{margin-top:18px;padding:22px;background:var(--surface)}
+.result[hidden]{display:none}
+.verdict{display:inline-flex;align-items:center;gap:8px;font:800 13px var(--display);letter-spacing:.06em;text-transform:uppercase;padding:9px 16px;border-radius:999px;border:1.5px solid currentColor}
+.verdict i{width:9px;height:9px;border-radius:50%;background:currentColor}
+.v-falso{color:var(--v-false)}.v-enganoso{color:var(--v-mislead)}.v-contexto{color:var(--v-context)}.v-verdadeiro{color:var(--v-true)}.v-sem{color:var(--v-none)}
+.result h3{margin:18px 0 8px;color:var(--muted);font:600 12px var(--mono);letter-spacing:.12em}
+.result ul{margin:0;padding-left:20px;display:grid;gap:6px}
+.confidence{font:500 13px var(--mono);color:var(--muted);margin-left:10px}
+.sites{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.sites a{font:500 13px var(--mono);text-decoration:none;border:1.5px solid var(--line-soft);border-radius:999px;padding:8px 13px}
+.sites a:hover{border-color:var(--accent);color:#fff;background:var(--accent-soft)}
+.followup{margin-top:20px;border-top:1.5px dashed var(--line-soft);padding-top:16px}
+.followup .row input{flex:1;min-width:180px;background:var(--bg);color:var(--fg);border:1.5px solid var(--line-soft);border-radius:999px;padding:12px 16px;font:400 16px var(--body)}
+.qa{display:grid;gap:10px;margin-bottom:12px}
+.qa p{margin:0;padding:10px 14px;border-radius:16px;background:var(--bg)}
+.qa p.q{color:var(--muted);font-style:italic}
+.status{display:flex;gap:10px;align-items:center;font:500 14px var(--mono);color:var(--muted)}
+.dots{display:inline-flex;gap:4px}.dots b{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:blink 1s infinite}.dots b:nth-child(2){animation-delay:.15s}.dots b:nth-child(3){animation-delay:.3s}
+@keyframes blink{50%{opacity:.2}}
+
+/* faixa de dados */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-top:22px}
+.stat{padding:18px 20px}
+.stat b{display:block;font:800 clamp(34px,5vw,46px)/1 var(--display);color:var(--accent)}
+.stat span{display:block;margin-top:10px;font-size:15.5px;color:var(--muted)}
+
+/* como funciona */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:22px}
+.step{padding:20px}
+.step h3{margin-bottom:8px}
+.step p{margin:0;color:var(--muted);font-size:16px}
+.step .tag{font:600 11px var(--mono);letter-spacing:.14em;color:var(--accent);text-transform:uppercase;margin-bottom:10px;display:block}
+
+/* trending */
+.tr-head{padding:34px 0 6px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 4px}
+.filters .chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.feed{display:grid;gap:18px;margin-top:20px}
+.card{display:grid;grid-template-columns:72px minmax(0,1fr);gap:0 18px;padding:20px;background:var(--surface)}
+.rank{font:800 38px/1 var(--display);color:var(--accent);padding-top:2px}
+.card .claim{font:800 clamp(17px,2.6vw,21px)/1.25 var(--display);text-transform:none;margin:0 0 6px;letter-spacing:0}
+.meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0 0}
+.meta .when{font:500 12px var(--mono);color:var(--muted)}
+.check{margin-top:14px;padding:14px 16px;border-radius:18px;background:var(--bg);border-left:4px solid currentColor}
+.check p{margin:0;color:var(--fg);font-size:16.5px}
+.check .src{display:flex;gap:8px 14px;flex-wrap:wrap;margin-top:10px;font:500 13px var(--mono)}
+.check .src a{color:var(--muted)}.check .src a:hover{color:var(--fg)}
+.foot-note{margin-top:26px;padding:16px 20px}
+
+/* sobre */
+.team{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-top:22px}
+.member{padding:18px;text-align:left}
+.member b{display:block;font:800 14px var(--display);text-transform:uppercase}
+.member span{font:500 13px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:22px}
+.two .pill{padding:20px}
+.two p{margin:8px 0 0;color:var(--muted);font-size:16px}
+.soon{display:inline-block;font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;border:1.5px dashed var(--muted);color:var(--muted);border-radius:999px;padding:4px 10px;margin-left:8px;vertical-align:middle}
+.contact{display:flex;gap:10px 24px;flex-wrap:wrap;margin-top:22px;font:500 15px var(--mono)}
+.copy{cursor:pointer;background:none;border:1.5px solid var(--line-soft);color:var(--fg);border-radius:999px;padding:6px 12px;font:500 12px var(--mono);margin-left:8px}
+.copy:hover{border-color:var(--line)}
+
+footer{margin-top:64px;border:1.5px solid var(--line);border-radius:999px;padding:14px 22px;display:flex;gap:12px;align-items:center;font:400 14px var(--body);flex-wrap:wrap}
+footer svg{width:20px;height:20px}
+footer span:last-child{margin-left:auto;color:var(--muted)}
+
+@media (max-width:560px){
+  body{font-size:16.5px}
+  nav.tabs{margin-left:0;width:100%}
+  nav.tabs a{padding:10px 13px}
+  .card{grid-template-columns:1fr;gap:8px}
+  .rank{font-size:28px}
+  footer{border-radius:24px}
+  footer span:last-child{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+
+
+
+
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="#verificar" aria-label="Desmascarando Fakes, início">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1c1.4 8.2 6.8 13.6 15 15-8.2 1.4-13.6 6.8-15 15C14.6 22.8 9.2 17.4 1 16 9.2 14.6 14.6 9.2 16 1z" fill="#d1121f"/></svg>
+      <span>DMFK<small>.IA</small></span>
+    </a>
+    <nav class="tabs" aria-label="Seções">
+      <a href="#verificar" data-view="verificar">Verificar</a>
+      <a href="#em-alta" data-view="em-alta">Em alta</a>
+      <a href="#sobre" data-view="sobre">O projeto</a>
+    </nav>
+  </header>
+
+  <!-- ========== VERIFICAR ========== -->
+  <main id="v-verificar" class="view" hidden>
+    <div class="hero">
+      <p class="eyebrow">Desmascare a desinformação</p>
+      <h1>Recebeu algo <em>duvidoso?</em><br>Cole aqui.</h1>
+      <p class="lede">Cole o link, o texto ou a frase que chegou no seu grupo. A IA analisa o conteúdo, diz se é verdadeiro, falso ou enganoso, explica o motivo e mostra onde conferir nas agências de checagem.</p>
+
+      <form class="checker pill" id="form" autocomplete="off">
+        <label for="claim">Link, notícia ou mensagem</label>
+        <textarea id="claim" placeholder="Ex.: https://... ou &quot;Compartilhe! Urnas foram trocadas antes da contagem...&quot;"></textarea>
+        <div class="examples" aria-label="Exemplos para testar">
+          <button type="button" class="chip" data-ex="Vídeo mostra presos comemorando a vitória de um candidato dentro de um presídio.">Exemplo: vídeo de presos</button>
+          <button type="button" class="chip" data-ex="Assinar o caderno de votação comprova fraude nas urnas eletrônicas.">Exemplo: caderno de votação</button>
+          <button type="button" class="chip" data-ex="Urgente: governo vai bloquear o Pix de quem receber mais de R$ 200 por mês. Repasse para todos os contatos!">Exemplo: corrente de Pix</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="go" type="submit">Verificar agora</button>
+          <p class="note" id="aiStatus">Sem login, sem cadastro. Nada fica salvo.</p>
+        </div>
+      </form>
+
+      <section class="result pill" id="result" hidden aria-live="polite"></section>
+    </div>
+
+    <section class="block">
+      <p class="eyebrow">O problema</p>
+      <h2>Quase 9 em cada 10 brasileiros já acreditaram em fake news</h2>
+      <div class="stats">
+        <div class="stat pill"><b>~90%</b><span>admitem ter acreditado em conteúdo falso (Instituto Locomotiva, via Agência Brasil)</span></div>
+        <div class="stat pill"><b>62%</b><span>confiam na própria capacidade de separar o falso do verdadeiro</span></div>
+        <div class="stat pill"><b>64%</b><span>dos conteúdos falsos em que acreditaram eram sobre venda de produtos</span></div>
+        <div class="stat pill"><b>63%</b><span>diziam respeito a propostas de campanhas eleitorais</span></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <p class="eyebrow">Como funciona</p>
+      <h2>Três passos para não ser enganado</h2>
+      <div class="steps">
+        <article class="step pill"><span class="tag">Passo 1</span><h3>Cole</h3><p>Link, print transcrito ou texto da mensagem. Funciona com qualquer assunto.</p></article>
+        <article class="step pill"><span class="tag">Passo 2</span><h3>A IA analisa</h3><p>Ela compara a afirmação com o que já foi checado, aponta sinais de alerta e diz o grau de certeza.</p></article>
+        <article class="step pill"><span class="tag">Passo 3</span><h3>Confira na fonte</h3><p>Você recebe atalhos de busca em agências como Lupa, Aos Fatos, Comprova, AFP e TSE.</p></article>
+      </div>
+    </section>
+  </main>
+
+  <!-- ========== EM ALTA ========== -->
+  <main id="v-em-alta" class="view" hidden>
+    <div class="tr-head">
+      <p class="eyebrow">Em alta · atualizado em 28/10/2026</p>
+      <h1>As fakes do <em>momento</em></h1>
+      <p class="lede">Os boatos que mais circularam depois do segundo turno das eleições, cada um com a verificação logo abaixo e o link da checagem original.</p>
+      <div class="filters" role="group" aria-label="Filtrar por veredito" id="filters"></div>
+    </div>
+    <div class="feed" id="feed"></div>
+    <p class="note foot-note pill">Estas checagens foram feitas por veículos e agências independentes e reunidas aqui com o link de cada fonte. Os boatos entram na lista pela repercussão que tiveram nas checagens da semana de 25 a 27 de outubro de 2026. Se um fato novo surgir, a checagem pode mudar.</p>
+  </main>
+
+  <!-- ========== SOBRE ========== -->
+  <main id="v-sobre" class="view" hidden>
+    <div class="tr-head">
+      <p class="eyebrow">Projeto escolar · Desmascarando Fakes</p>
+      <h1>A vilã vira <em>aliada</em></h1>
+      <p class="lede">O DMFK é um portal que junta a desinformação famosa, de agora ou de sempre, e explica a razão exata de cada uma ser falsa. A inteligência artificial, que também produz fake news, passa a trabalhar contra elas.</p>
+    </div>
+
+    <section class="block" style="margin-top:34px">
+      <h2>Por que escolher o DMFK</h2>
+      <div class="two">
+        <div class="pill"><h3>IA que admite quando não sabe</h3><p>O assistente só responde quando tem base para isso. Se faltar informação, ele diz que não é possível concluir, em vez de inventar.</p></div>
+        <div class="pill"><h3>Conversa que não fica guardada</h3><p>Ao encerrar a verificação, o chat é apagado. Não pedimos login nem cadastro.</p></div>
+        <div class="pill"><h3>Gratuito para todos</h3><p>Acesso livre à informação, mantido apenas por anúncios no site.</p></div>
+        <div class="pill"><h3>Vídeo e áudio gerados por IA <span class="soon">em breve</span></h3><p>Próxima etapa do projeto: identificar se um vídeo ou áudio foi criado por inteligência artificial.</p></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Equipe</h2>
+      <div class="team">
+        <div class="member pill"><b>Francisco Dias</b><span>Diretor tático</span></div>
+        <div class="member pill"><b>Eduardo Peixoto</b><span>Diretor operacional</span></div>
+        <div class="member pill"><b>Manuela Canuto</b><span>Administração</span></div>
+        <div class="member pill"><b>Sophia Molina</b><span>Diretora estratégica</span></div>
+        <div class="member pill"><b>Ingrid Farias</b><span>Diretora criativa</span></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Fale com a gente</h2>
+      <div class="contact">
+        <span>DMFK.info@gmail.com <button class="copy" data-copy="DMFK.info@gmail.com">copiar</button></span>
+        <span>(43) 99690-2884 <button class="copy" data-copy="(43) 99690-2884">copiar</button></span>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1c1.4 8.2 6.8 13.6 15 15-8.2 1.4-13.6 6.8-15 15C14.6 22.8 9.2 17.4 1 16 9.2 14.6 14.6 9.2 16 1z" fill="#d1121f"/></svg>
+    <span>Desmascarando Fakes</span>
+    <span>A IA pode errar. Confirme sempre nas fontes.</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  /* ---------- navegação por hash ---------- */
+  var views=["verificar","em-alta","sobre"];
+  function route(){
+    var h=(location.hash||"").replace("#","");
+    if(views.indexOf(h)<0)h="verificar";
+    views.forEach(function(v){
+      document.getElementById("v-"+v).hidden=(v!==h);
+    });
+    document.querySelectorAll("nav.tabs a").forEach(function(a){
+      if(a.dataset.view===h)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");
+    });
+    window.scrollTo(0,0);
+  }
+  window.addEventListener("hashchange",route);
+  route();
+
+  /* ---------- veredito ---------- */
+  var VERD={
+    FALSO:{cls:"v-falso",label:"Falso"},
+    ENGANOSO:{cls:"v-enganoso",label:"Enganoso"},
+    FORA_DE_CONTEXTO:{cls:"v-contexto",label:"Fora de contexto"},
+    VERDADEIRO:{cls:"v-verdadeiro",label:"Verdadeiro"},
+    SEM_DADOS:{cls:"v-sem",label:"Sem dados suficientes"}
+  };
+  function esc(s){var d=document.createElement("div");d.textContent=String(s==null?"":s);return d.innerHTML}
+
+  var SITES=[
+    {n:"Agência Lupa",d:"agencialupa.org"},
+    {n:"Aos Fatos",d:"aosfatos.org"},
+    {n:"g1 Fato ou Fake",d:"g1.globo.com/fato-ou-fake"},
+    {n:"Comprova",d:"projetocomprova.com.br"},
+    {n:"AFP Checamos",d:"checamos.afp.com"},
+    {n:"TSE Fato ou Boato",d:"justicaeleitoral.jus.br/fato-ou-boato"},
+    {n:"Boatos.org",d:"boatos.org"},
+    {n:"E-Farsas",d:"e-farsas.com"}
+  ];
+  function siteLinks(q){
+    return SITES.map(function(s){
+      var u="https://www.google.com/search?q="+encodeURIComponent(q+" site:"+s.d);
+      return '<a href="'+u+'" target="_blank" rel="noopener">'+esc(s.n)+' ↗</a>';
+    }).join("");
+  }
+
+  /* ---------- feed em alta ---------- */
+  var ITEMS=[
+    {c:"Vídeo mostra presidiários comemorando a vitória de Lula",v:"FALSO",
+     w:"26/10/2026",
+     t:"A gravação é de 19 de fevereiro de 2022, no Complexo Prisional do Curado, em Recife. Os detentos comemoravam um gol do Santa Cruz contra o Sport no campeonato pernambucano.",
+     s:[["Agência Lupa","https://www.agencialupa.org/verificacao/2026/10/26/video-mostra-detentos-comemorando-gol-em-2022-e-nao-vitoria-de-lula/"]]},
+    {c:"Fiscais do PL foram expulsos da sala-cofre do TSE",v:"FALSO",
+     w:"26/10/2026",
+     t:"O TSE negou a expulsão. Dois fiscais do PL acompanharam os procedimentos oficiais na Sala de Totalização e na Sala dos Partidos Políticos. A sala-cofre não é aberta ao público, e registros de acesso e imagens mostram a presença dos fiscais.",
+     s:[["TSE","https://www.justicaeleitoral.jus.br/fato-ou-boato/checagens/2026/e-falso-que-fiscais-do-pl-foram-retirados-da-sala-cofre-do-tse"],["Aos Fatos","https://www.aosfatos.org/noticias/derrotado-flavio-mente-sugerir-eleicao-fraudada/"]]},
+    {c:"Polícia apreendeu R$ 8,5 milhões para comprar votos para Lula",v:"FALSO",
+     w:"26/10/2026",
+     t:"As imagens vêm de uma operação de janeiro de 2026 em Cristalina (GO), com cerca de R$ 1,7 milhão apreendidos. Não há ligação com a campanha de Lula.",
+     s:[["Agência Lupa","https://www.agencialupa.org/verificacao/2026/10/26/video-de-apreensao-de-r-17-milhao-em-mala-nao-trata-de-compra-de-votos/"]]},
+    {c:"Assinar o caderno de votação comprovaria fraude nas urnas",v:"ENGANOSO",
+     w:"27/10/2026",
+     t:"Segundo o TSE, a assinatura nem é exigida quando a biometria funciona. E o caderno não registra em quem cada pessoa votou, então a assinatura não mostra se votos foram alterados.",
+     s:[["TSE","https://www.justicaeleitoral.jus.br/fato-ou-boato/checagens/2026/video-engana-ao-apresentar-assinatura-no-caderno-de-votacao-como-forma-de-comprovar-fraude-na-urna"]]},
+    {c:"O TSE contou votos antes de as urnas chegarem ao cartório",v:"ENGANOSO",
+     w:"27/10/2026",
+     t:"A transmissão dos resultados é separada do transporte físico das urnas. Na 408ª Zona Eleitoral, a transmissão foi de cerca de 17h20 às 21h e a descarga seguiu até 21h30. Essa diferença faz parte do procedimento normal.",
+     s:[["TSE","https://www.justicaeleitoral.jus.br/fato-ou-boato/checagens/2026/resultados-podem-ser-totalizados-antes-da-chegada-das-urnas-ao-cartorio-eleitoral"]]},
+    {c:"Brasileiros foram impedidos de votar em Londres no segundo turno",v:"FORA_DE_CONTEXTO",
+     w:"25/10/2026",
+     t:"A reportagem da CNN Brasil é real, mas é de 4 de outubro, do primeiro turno. Eleitores estavam cadastrados em Edimburgo e não em Londres. O vídeo não mostra um novo episódio no segundo turno.",
+     s:[["Agência Lupa","https://www.agencialupa.org/verificacao/2026/10/25/video-sobre-brasileiros-impedidos-de-votar-em-londres-e-do-1o-turno/"]]},
+    {c:"Foto mostra apoiadora de Flávio rasgando bandeira de Nossa Senhora Aparecida",v:"FALSO",
+     w:"25/10/2026",
+     t:"A Lupa encontrou sinais de que a imagem foi feita com inteligência artificial. O g1, citado como autor da matéria, nunca publicou a história, e não há prova de que a cena aconteceu.",
+     s:[["Agência Lupa","https://www.agencialupa.org/verificacao/2026/10/25/e-falsa-imagem-que-mostra-apoiadora-de-flavio-rasgando-bandeira-de-nossa-senhora-aparecida/"]]},
+    {c:"Prorrogação da votação foi manobra para favorecer Lula",v:"ENGANOSO",
+     w:"26/10/2026",
+     t:"A prorrogação foi decidida por problemas de transporte de eleitores. As duas campanhas pediram extensão, e o pedido do PL incluía Curitiba. Não há evidência de que ela tenha mudado o resultado.",
+     s:[["Aos Fatos","https://www.aosfatos.org/noticias/derrotado-flavio-mente-sugerir-eleicao-fraudada/"]]},
+    {c:"Homens armados comemoram a vitória de Lula em vídeo",v:"FALSO",
+     w:"26/10/2026",
+     t:"O vídeo já circulava em 21 de outubro, quatro dias antes do segundo turno. Mostra um confronto entre grupos criminosos no Rio de Janeiro e não tem relação com a eleição.",
+     s:[["Agência Lupa","https://www.agencialupa.org/jornalismo/2026/10/26/e-falso-que-video-de-meninos-armados-mostre-comemoracao-pela-vitoria-de-lula/"]]},
+    {c:"Jair Bolsonaro foi preso por desacato e levado de volta à Papuda",v:"FALSO",
+     w:"26/10/2026",
+     t:"O caso policial envolveu outro homem, que discutiu com seguranças na residência do ex-presidente e foi liberado após assinar um termo. Bolsonaro não estava envolvido e segue em prisão domiciliar. Nenhuma decisão do STF mandou ele voltar à prisão.",
+     s:[["Aos Fatos","https://www.aosfatos.org/noticias/jair-bolsonaro-nao-foi-preso-desacato/"]]}
+  ];
+  var filter="TODOS";
+  function renderFilters(){
+    var box=document.getElementById("filters");
+    var counts={TODOS:ITEMS.length};
+    ITEMS.forEach(function(i){counts[i.v]=(counts[i.v]||0)+1});
+    var keys=["TODOS"].concat(Object.keys(VERD).filter(function(k){return counts[k]}));
+    box.innerHTML=keys.map(function(k){
+      var lab=k==="TODOS"?"Todas":VERD[k].label;
+      return '<button type="button" class="chip" data-f="'+k+'" aria-pressed="'+(k===filter)+'">'+lab+' · '+counts[k]+'</button>';
+    }).join("");
+  }
+  function renderFeed(){
+    var feed=document.getElementById("feed");
+    var list=ITEMS.filter(function(i){return filter==="TODOS"||i.v===filter});
+    feed.innerHTML=list.map(function(i){
+      var v=VERD[i.v];var n=ITEMS.indexOf(i)+1;
+      var src=i.s.map(function(s){return '<a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+' ↗</a>'}).join("");
+      return '<article class="card pill"><div class="rank" aria-label="Posição '+n+'">'+String(n).padStart(2,"0")+'</div><div>'+
+        '<h3 class="claim">'+esc(i.c)+'</h3>'+
+        '<div class="meta"><span class="verdict '+v.cls+'"><i></i>'+v.label+'</span><span class="when">checado em '+i.w+'</span></div>'+
+        '<div class="check '+v.cls+'"><p style="color:var(--fg)">'+esc(i.t)+'</p><div class="src"><span style="color:var(--muted)">Fonte:</span>'+src+'</div></div>'+
+        '</div></article>';
+    }).join("");
+  }
+  document.getElementById("filters").addEventListener("click",function(e){
+    var b=e.target.closest("[data-f]");if(!b)return;
+    filter=b.dataset.f;renderFilters();renderFeed();
+  });
+  renderFilters();renderFeed();
+
+  /* ---------- verificador (IA) ---------- */
+  var sample=null, aiTried=false;
+  var statusEl=document.getElementById("aiStatus");
+  var resultEl=document.getElementById("result");
+  var goBtn=document.getElementById("go");
+  var ctrl=null, lastCtx=null, history=[];
+
+  function getSample(){
+    if(aiTried)return Promise.resolve(sample);
+    aiTried=true;
+    if(!window.claude||!window.claude.use)return Promise.resolve(null);
+    return window.claude.use("sample").then(function(s){sample=s;return s}).catch(function(){return null});
+  }
+
+  var RULES = "Você é o verificador do projeto Desmascarando Fakes. Hoje é 28 de outubro de 2026. " +
+    "Seu conhecimento vai até meados de 2026 e você NÃO consegue abrir links nem navegar. " +
+    "Regras: (1) Só dê veredito FALSO, ENGANOSO, FORA_DE_CONTEXTO ou VERDADEIRO se tiver base concreta, como um boato conhecido e já desmentido, um fato histórico estabelecido ou sinais claros no próprio texto (golpe típico, tom alarmista sem fonte, data antiga reaproveitada). " +
+    "(2) Se a entrada for só um link e você não souber do que se trata, ou se o fato for recente demais, use SEM_DADOS. Nunca invente conteúdo de uma página. " +
+    "(3) Seja direto, em português do Brasil, frases curtas. (4) Não opine sobre candidatos nem partidos; avalie só a afirmação.";
+
+  function runCheck(text){
+    var prompt = RULES + "\n\nResponda SOMENTE com JSON neste formato:\n" +
+      '{"veredito":"FALSO|ENGANOSO|FORA_DE_CONTEXTO|VERDADEIRO|SEM_DADOS","confianca":"alta|media|baixa","resumo":"uma frase com a conclusão","motivos":["até 4 motivos claros"],"sinais_de_alerta":["até 4 sinais para o leitor reconhecer, pode ser vazio"],"termos_de_busca":"3 a 6 palavras para buscar nas agências de checagem"}\n\n' +
+      "CONTEÚDO A VERIFICAR:\n" + text;
+    return sample.json(prompt,{modelTier:"default",cache:false,signal:ctrl.signal});
+  }
+
+  function showResult(r,text){
+    var key=VERD[r.veredito]?r.veredito:"SEM_DADOS";var v=VERD[key];
+    var motivos=(r.motivos||[]).map(function(m){return "<li>"+esc(m)+"</li>"}).join("");
+    var sinais=(r.sinais_de_alerta||[]).map(function(m){return "<li>"+esc(m)+"</li>"}).join("");
+    var q=r.termos_de_busca||text.slice(0,80);
+    resultEl.innerHTML=
+      '<div><span class="verdict '+v.cls+'"><i></i>'+v.label+'</span><span class="confidence">certeza: '+esc(r.confianca||"baixa")+'</span></div>'+
+      '<p style="font-size:20px;margin:16px 0 0">'+esc(r.resumo||"")+'</p>'+
+      (motivos?'<h3>Por quê</h3><ul>'+motivos+'</ul>':'')+
+      (sinais?'<h3>Sinais de alerta</h3><ul>'+sinais+'</ul>':'')+
+      '<h3>Confira nas agências</h3><div class="sites">'+siteLinks(q)+'</div>'+
+      '<p class="note" style="margin-top:14px">A IA não abre links e pode errar. Use os atalhos acima para confirmar antes de compartilhar.</p>'+
+      '<div class="followup"><h3 style="margin-top:0">Ficou com dúvida?</h3><div class="qa" id="qa"></div>'+
+      '<form class="row" id="fu"><input id="fuq" type="text" aria-label="Sua dúvida" placeholder="Pergunte sobre esta verificação"><button class="btn ghost" type="submit">Perguntar</button></form>'+
+      '<div class="row" style="margin-top:14px"><button class="btn" type="button" id="reset">Nova verificação e apagar conversa</button></div></div>';
+    resultEl.hidden=false;
+    lastCtx={text:text,r:r};history=[];
+    resultEl.scrollIntoView({behavior:"smooth",block:"nearest"});
+  }
+
+  function showError(msg){
+    resultEl.innerHTML='<p style="margin:0">'+esc(msg)+'</p>';resultEl.hidden=false;
+  }
+
+  document.getElementById("form").addEventListener("submit",function(e){
+    e.preventDefault();
+    var text=document.getElementById("claim").value.trim();
+    if(!text){statusEl.textContent="Cole um link ou um texto primeiro.";return}
+    goBtn.disabled=true;
+    resultEl.hidden=false;
+    resultEl.innerHTML='<div class="status"><span class="dots"><b></b><b></b><b></b></span>Analisando o conteúdo...</div>';
+    getSample().then(function(s){
+      if(!s){
+        goBtn.disabled=false;
+        showError("A verificação por IA só funciona quando o site é aberto dentro do Claude, com a permissão ativada. Enquanto isso, use as agências: ");
+        resultEl.innerHTML+='<div class="sites">'+siteLinks(text.slice(0,80))+'</div>';
+        return;
+      }
+      ctrl=new AbortController();
+      runCheck(text).then(function(r){goBtn.disabled=false;showResult(r,text)})
+      .catch(function(err){
+        goBtn.disabled=false;
+        var c=err&&err.code;
+        if(c==="not_granted")showError("A permissão para usar a IA foi negada. Permita e tente de novo.");
+        else if(c==="rate_limited")showError("Muitas verificações seguidas. Espere um instante e tente de novo.");
+        else if(c==="cancelled")resultEl.hidden=true;
+        else showError("Não consegui concluir a análise agora. Tente de novo em instantes.");
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-ex]").forEach(function(b){
+    b.addEventListener("click",function(){var t=document.getElementById("claim");t.value=b.dataset.ex;t.focus()});
+  });
+
+  resultEl.addEventListener("click",function(e){
+    if(e.target.id==="reset"){
+      if(ctrl)ctrl.abort();
+      resultEl.hidden=true;resultEl.innerHTML="";lastCtx=null;history=[];
+      document.getElementById("claim").value="";
+      document.getElementById("claim").focus();
+    }
+  });
+  resultEl.addEventListener("submit",function(e){
+    if(e.target.id!=="fu")return;
+    e.preventDefault();
+    var inp=document.getElementById("fuq");var q=inp.value.trim();
+    if(!q||!lastCtx||!sample)return;
+    var qa=document.getElementById("qa");
+    var pq=document.createElement("p");pq.className="q";pq.textContent=q;qa.appendChild(pq);
+    var pa=document.createElement("p");pa.textContent="Pensando...";qa.appendChild(pa);
+    inp.value="";
+    var ctx=RULES+" Responda a dúvida do usuário sobre a verificação abaixo em até 4 frases. Só responda se tiver certeza. Se não tiver informação suficiente, diga exatamente: \"Não tenho informação suficiente para responder com segurança.\"\n\nCONTEÚDO VERIFICADO:\n"+lastCtx.text+"\n\nRESULTADO ANTERIOR:\n"+JSON.stringify(lastCtx.r)+"\n\n";
+    var msgs=[];
+    history.forEach(function(h){msgs.push({role:"user",content:h.q});msgs.push({role:"assistant",content:h.a})});
+    msgs.push({role:"user",content:q});
+    var first=msgs.shift();first={role:"user",content:ctx+"DÚVIDA: "+first.content};
+    msgs.unshift(first);
+    sample(msgs,{cache:false,modelTier:"quick",signal:ctrl?ctrl.signal:undefined}).then(function(o){
+      pa.textContent=o.text;history.push({q:q,a:o.text});
+    }).catch(function(){pa.textContent="Não consegui responder agora."});
+  });
+
+  /* ---------- copiar contato ---------- */
+  document.querySelectorAll(".copy").forEach(function(b){
+    b.addEventListener("click",function(){
+      var t=b.dataset.copy;
+      try{navigator.clipboard.writeText(t).then(function(){b.textContent="copiado"},function(){b.textContent="selecione o texto"})}catch(e){b.textContent="selecione o texto"}
+      setTimeout(function(){b.textContent="copiar"},1800);
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
